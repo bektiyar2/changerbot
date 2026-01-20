@@ -46,33 +46,37 @@ async def update_github_data(date_str: str, amount: int):
             else:
                 return False, f"Ошибка GitHub (GET): {resp.status}"
 
-        # 2. Обновляем историю
+        # 2. Обновляем историю и общий счет
         history = current_data.get("history", [])
+        total_collected = current_data.get("collected", 0)
         
         # Ищем, есть ли уже такая дата
         found = False
         for entry in history:
             if entry["date"] == date_str:
+                # Если дата найдена, вычитаем старое значение и прибавляем новое
+                diff = amount - entry["amount"]
+                total_collected += diff
                 entry["amount"] = amount  # Перезаписываем сумму для этой даты
                 found = True
                 break
         
         if not found:
+            # Если даты нет, просто прибавляем к общему итогу и добавляем в историю
             history.append({"date": date_str, "amount": amount})
+            total_collected += amount
 
-        # Сортируем историю по дате (чтобы график не ломался при ручном вводе старых дат)
-        # Предполагаем текущий год для корректной сортировки
+        # Сортируем историю по дате
         current_year = datetime.now().year
         history.sort(key=lambda x: datetime.strptime(f"{x['date']}.{current_year}", "%d.%m.%Y"))
 
-        # Оставляем только последние 3 дня для гистограммы
+        # Оставляем только последние 3 дня в истории (для экономии места)
         if len(history) > 3:
             history = history[-3:]
 
-        # Обновляем общие данные
+        # Сохраняем обновленные данные
         current_data["history"] = history
-        # Общий сбор берем из последней хронологической записи
-        current_data["collected"] = history[-1]["amount"]
+        current_data["collected"] = total_collected  # Теперь здесь правильная сумма
         current_data["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
 
         # 3. Кодируем и отправляем
@@ -142,3 +146,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         print("Бот выключен")
+
